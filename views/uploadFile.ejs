@@ -1,0 +1,16 @@
+<form action="/upload" method="post" enctype="multipart/form-data">
+  <label for="folders" id="folders">Folder</label>
+
+  <% if (locals.folders) { %>
+  <select id="folder">
+    <% locals.folders.forEach(folder => { %>
+    <option value="<%= folder %>"><%= folder %></option>
+    <% }); %>
+  </select>
+  <% }else{ %>
+  <span>No folders created</span>
+  <% } %>
+
+  <input type="file" name="file" />
+  <button type="submit">Upload</button>
+</form>
