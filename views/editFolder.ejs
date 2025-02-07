@@ -1,0 +1,10 @@
+<form action="/edit/folder/<%= folder.id %>" method="post">
+  <label for="foldername">Folder Name: </label>
+  <input
+    type="text"
+    id="foldername"
+    name="foldername"
+    placeholder="<%= folder.name %>"
+  />
+  <button type="submit">Update</button>
+</form>

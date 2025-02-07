@@ -4,7 +4,7 @@
   <% if (locals.folders) { %>
   <select id="folder">
     <% locals.folders.forEach(folder => { %>
-    <option value="<%= folder %>"><%= folder %></option>
+    <option value="<%= folder %>"><%= folder.name %></option>
     <% }); %>
   </select>
   <% }else{ %>

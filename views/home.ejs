@@ -1,1 +1,8 @@
-<h1>File Uploader</h1>
+<%- include('./partials/sidebar.ejs') %> <% if (locals.folders) { %> <%
+folders.forEach(folder => { %>
+<div id="<%= folder.id %>">
+  <a href="/folder/<%= folder.id %>"><%= folder.name %></a>
+  <a href="/edit/folder/<%= folder.id %>"><button>Edit</button></a>
+  <a href="/delete/folder/<%= folder.id %>"><button>Delete</button></a>
+</div>
+<% }) %> <% } %>
