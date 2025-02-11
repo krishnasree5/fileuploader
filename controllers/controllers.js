@@ -1,12 +1,14 @@
-import multer from "multer";
+import multer, { memoryStorage } from "multer";
+import { uploadFile } from "../supabase/supabase.js";
 import {
   getAllFolders,
   getFolder,
   createFolder,
   updateFolder,
   deleteFolder,
+  uploadFile as uploadFilePrisma,
 } from "../prisma/queries.js";
-const upload = multer({ dest: "./uploads/" });
+const upload = multer({ storage: memoryStorage() });
 
 export const home = async (req, res) => {
   const folders = await getAllFolders(2);
@@ -45,14 +47,48 @@ export const deleteGet = async (req, res) => {
   res.redirect("/home");
 };
 
-export const uploadGet = (req, res) => {
-  res.render("uploadFile");
+export const uploadGet = async (req, res) => {
+  const folders = await getAllFolders(2);
+  // console.log(folders);
+  res.render("uploadFile", { folders: folders });
 };
 
 export const uploadPost = [
-  upload.array("file"),
-  (req, res) => {
-    console.log(req.files);
-    res.redirect("/home");
+  upload.single("file"),
+  async (req, res) => {
+    console.log(req.body);
+    // console.log(req.file);
+
+    try {
+      if (!req.file || req.file.length == 0) {
+        return res.status(404).send("No file uploaded");
+      }
+      const userId = String(2); //req.user.id
+      const fileName = req.file.originalname;
+      const folder = JSON.parse(req.body.folder);
+      const folderId = folder.id;
+      const folderName = folder.name;
+      const uploadPath = `${userId}/${folderName}/${fileName}`;
+      const file = req.file.buffer;
+
+      const { data, error } = await uploadFile(uploadPath, file);
+
+      try {
+        await uploadFilePrisma(fileName, folderId, uploadPath);
+      } catch (error) {
+        console.error("Database error:", error);
+        throw new Error("Failed to save file metadata to database");
+      }
+
+      if (error) {
+        console.error("Supabase upload error: ", error);
+        return res.status(500).send("File upload failed");
+      }
+
+      await res.redirect("/home");
+    } catch (error) {
+      console.error("Upload error:", error);
+      res.status(500).send("Server error during file upload");
+    }
   },
 ];

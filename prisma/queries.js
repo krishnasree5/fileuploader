@@ -33,3 +33,9 @@ export const updateFolder = async (folderId, folderName) => {
 export const deleteFolder = async (folderId) => {
   await prisma.folder.delete({ where: { id: folderId } });
 };
+
+export const uploadFile = async (fileName, folderId, uploadPath) => {
+  await prisma.file.create({
+    data: { name: fileName, folderId: folderId, url: uploadPath },
+  });
+};
