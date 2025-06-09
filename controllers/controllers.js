@@ -11,7 +11,7 @@ import {
 const upload = multer({ storage: memoryStorage() });
 
 export const home = async (req, res) => {
-  const folders = await getAllFolders(2);
+  const folders = await getAllFolders(4);
   // console.log(folders);
 
   res.render("home", { folders: folders });
@@ -22,7 +22,7 @@ export const createGet = async (req, res) => {
 };
 
 export const createPost = async (req, res) => {
-  await createFolder(req.body.foldername, 2);
+  await createFolder(req.body.foldername, 4);
   res.redirect("/home");
 };
 
@@ -48,7 +48,7 @@ export const deleteGet = async (req, res) => {
 };
 
 export const uploadGet = async (req, res) => {
-  const folders = await getAllFolders(2);
+  const folders = await getAllFolders(4);
   // console.log(folders);
   res.render("uploadFile", { folders: folders });
 };
@@ -63,11 +63,11 @@ export const uploadPost = [
       if (!req.file || req.file.length == 0) {
         return res.status(404).send("No file uploaded");
       }
-      const userId = String(2); //req.user.id
-      const fileName = req.file.originalname;
+      const userId = String(4); //req.user.id
+      const fileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
       const folder = JSON.parse(req.body.folder);
       const folderId = folder.id;
-      const folderName = folder.name;
+      const folderName = folder.name.replace(/[^a-zA-Z0-9.-]/g, "_");
       const uploadPath = `${userId}/${folderName}/${fileName}`;
       const file = req.file.buffer;
 
