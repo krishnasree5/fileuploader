@@ -2,40 +2,93 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export const getAllFolders = async (userId) => {
-  const { Folder } = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { Folder: true },
+export const createUser = async (userData) => {
+  return await prisma.user.create({
+    data: userData,
   });
-  return Folder;
+};
+
+export const getAllFolders = async (userId) => {
+  return await prisma.folder.findMany({
+    where: {
+      createdBy: userId,
+    },
+    include: {
+      File: true,
+    },
+  });
 };
 
 export const getFolder = async (folderId) => {
-  const folder = await prisma.folder.findUnique({
-    where: { id: folderId },
+  return await prisma.folder.findUnique({
+    where: {
+      id: folderId,
+    },
+    include: {
+      File: true,
+    },
   });
-  // console.log(folder);
-
-  return folder;
 };
 
-export const createFolder = async (folderName, userId) => {
-  await prisma.folder.create({ data: { name: folderName, createdBy: userId } });
+export const createFolder = async (name, userId) => {
+  return await prisma.folder.create({
+    data: {
+      name: name,
+      createdBy: userId,
+    },
+  });
 };
 
-export const updateFolder = async (folderId, folderName) => {
-  await prisma.folder.update({
-    data: { name: folderName },
-    where: { id: folderId },
+export const updateFolder = async (folderId, name) => {
+  return await prisma.folder.update({
+    where: {
+      id: folderId,
+    },
+    data: {
+      name: name,
+    },
   });
 };
 
 export const deleteFolder = async (folderId) => {
-  await prisma.folder.delete({ where: { id: folderId } });
+  return await prisma.folder.delete({
+    where: {
+      id: folderId,
+    },
+  });
 };
 
-export const uploadFile = async (fileName, folderId, uploadPath) => {
-  await prisma.file.create({
-    data: { name: fileName, folderId: folderId, url: uploadPath },
+export const uploadFile = async (name, folderId, url) => {
+  return await prisma.file.create({
+    data: {
+      name: name,
+      folderId: folderId,
+      url: url,
+    },
+    select: {
+      id: true,
+      name: true,
+      url: true,
+      folderId: true,
+    },
+  });
+};
+
+export const deleteFile = async (fileId) => {
+  return await prisma.file.delete({
+    where: {
+      id: fileId,
+    },
+  });
+};
+
+export const updateFile = async (fileId, url) => {
+  return await prisma.file.update({
+    where: {
+      id: fileId,
+    },
+    data: {
+      url: url,
+    },
   });
 };

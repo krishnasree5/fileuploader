@@ -1,5 +1,11 @@
 import multer, { memoryStorage } from "multer";
-import { uploadFile } from "../supabase/supabase.js";
+import {
+  uploadFile,
+  signUp,
+  signIn,
+  signOut,
+  getUser,
+} from "../supabase/supabase.js";
 import {
   getAllFolders,
   getFolder,
@@ -7,85 +13,191 @@ import {
   updateFolder,
   deleteFolder,
   uploadFile as uploadFilePrisma,
+  createUser,
+  deleteFile,
+  updateFile,
 } from "../prisma/queries.js";
 const upload = multer({ storage: memoryStorage() });
 
-export const home = async (req, res) => {
-  const folders = await getAllFolders(4);
-  // console.log(folders);
-
-  res.render("home", { folders: folders });
+// Auth Controllers
+export const loginGet = (req, res) => {
+  res.render("login", { error: null });
 };
 
-export const createGet = async (req, res) => {
+export const loginPost = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const { data, error } = await signIn(email, password);
+
+    if (error) {
+      return res.render("login", { error: error.message });
+    }
+
+    res.redirect("/home");
+  } catch (error) {
+    res.render("login", { error: "An error occurred during login" });
+  }
+};
+
+export const signupGet = (req, res) => {
+  res.render("signup", { error: null });
+};
+
+export const signupPost = async (req, res) => {
+  const { firstName, lastName, username, email, password } = req.body;
+
+  try {
+    // Create user in Supabase
+    const { data: authData, error: authError } = await signUp(email, password, {
+      firstName,
+      lastName,
+      username,
+    });
+
+    if (authError) {
+      return res.render("signup", { error: authError.message });
+    }
+
+    // Create user in Prisma database using Supabase user ID
+    await createUser({
+      id: authData.user.id, // Use Supabase user ID
+      firstName,
+      lastName,
+      username,
+      email,
+      password, // Note: In a real app, you should hash this password
+    });
+
+    res.redirect("/login");
+  } catch (error) {
+    console.error("Signup error:", error);
+    res.render("signup", { error: "An error occurred during signup" });
+  }
+};
+
+export const logout = async (req, res) => {
+  await signOut();
+  res.redirect("/login");
+};
+
+// Protected Controllers
+export const home = async (req, res) => {
+  try {
+    console.log("Home controller: Getting user...");
+    const { user, error: userError } = await getUser();
+
+    if (userError) {
+      console.error("Error getting user:", userError);
+      return res.redirect("/login");
+    }
+
+    if (!user) {
+      console.error("No user found");
+      return res.redirect("/login");
+    }
+
+    console.log("Home controller: User found, getting folders...");
+    const folders = await getAllFolders(user.id);
+    console.log("Home controller: Folders retrieved, rendering...");
+    res.render("home", { folders: folders });
+  } catch (error) {
+    console.error("Home controller error:", error);
+    res.redirect("/login");
+  }
+};
+
+export const createGet = (req, res) => {
   res.render("createFolder");
 };
 
 export const createPost = async (req, res) => {
-  await createFolder(req.body.foldername, 4);
-  res.redirect("/home");
+  try {
+    const { user } = await getUser();
+    await createFolder(req.body.foldername, user.id);
+    res.redirect("/home");
+  } catch (error) {
+    res.redirect("/login");
+  }
 };
 
 export const editGet = async (req, res) => {
-  const folderId = parseInt(req.params.folderid);
-  const folder = await getFolder(folderId);
-  res.render("editFolder", { folder: folder });
+  try {
+    const folderId = parseInt(req.params.folderid);
+    const folder = await getFolder(folderId);
+    res.render("editFolder", { folder: folder });
+  } catch (error) {
+    res.redirect("/login");
+  }
 };
 
 export const editPost = async (req, res) => {
-  const folderName = req.body.foldername;
-  const folderId = parseInt(req.params.folderid);
-  await updateFolder(folderId, folderName);
-  res.redirect("/home");
+  try {
+    const folderName = req.body.foldername;
+    const folderId = parseInt(req.params.folderid);
+    await updateFolder(folderId, folderName);
+    res.redirect("/home");
+  } catch (error) {
+    res.redirect("/login");
+  }
 };
 
 export const deleteGet = async (req, res) => {
-  const folderId = parseInt(req.params.folderid);
-  // console.log(folderId);
-
-  await deleteFolder(folderId);
-  res.redirect("/home");
+  try {
+    const folderId = parseInt(req.params.folderid);
+    await deleteFolder(folderId);
+    res.redirect("/home");
+  } catch (error) {
+    res.redirect("/login");
+  }
 };
 
 export const uploadGet = async (req, res) => {
-  const folders = await getAllFolders(4);
-  // console.log(folders);
-  res.render("uploadFile", { folders: folders });
+  try {
+    const { user } = await getUser();
+    const folders = await getAllFolders(user.id);
+    res.render("uploadFile", { folders: folders });
+  } catch (error) {
+    res.redirect("/login");
+  }
 };
 
 export const uploadPost = [
   upload.single("file"),
   async (req, res) => {
-    console.log(req.body);
-    // console.log(req.file);
-
     try {
       if (!req.file || req.file.length == 0) {
         return res.status(404).send("No file uploaded");
       }
-      const userId = String(4); //req.user.id
-      const fileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+
+      const { user } = await getUser();
       const folder = JSON.parse(req.body.folder);
       const folderId = folder.id;
-      const folderName = folder.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-      const uploadPath = `${userId}/${folderName}/${fileName}`;
+
+      // Create file record first to get the file ID
+      const fileRecord = await uploadFilePrisma(
+        req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_"),
+        folderId,
+        "" // URL will be updated after upload
+      );
+
+      // Use IDs in the storage path
+      const uploadPath = `${user.id}/${folderId}/${fileRecord.id}`;
       const file = req.file.buffer;
 
       const { data, error } = await uploadFile(uploadPath, file);
 
-      try {
-        await uploadFilePrisma(fileName, folderId, uploadPath);
-      } catch (error) {
-        console.error("Database error:", error);
-        throw new Error("Failed to save file metadata to database");
-      }
-
       if (error) {
         console.error("Supabase upload error: ", error);
+        // Clean up the file record if upload fails
+        await deleteFile(fileRecord.id);
         return res.status(500).send("File upload failed");
       }
 
-      await res.redirect("/home");
+      // Update the file record with the correct URL
+      await updateFile(fileRecord.id, uploadPath);
+
+      res.redirect("/home");
     } catch (error) {
       console.error("Upload error:", error);
       res.status(500).send("Server error during file upload");
