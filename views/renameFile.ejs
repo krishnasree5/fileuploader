@@ -1,0 +1,7 @@
+<h1>Rename File</h1>
+<form action="/rename/file/<%= file.id %>" method="POST">
+  <label for="name">New Name:</label>
+  <input type="text" id="name" name="name" value="<%= file.name %>" required />
+  <button type="submit">Rename</button>
+  <a href="/folder/<%= file.folderId %>">Cancel</a>
+</form>

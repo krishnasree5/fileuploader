@@ -16,6 +16,8 @@ import {
   createUser,
   deleteFile,
   updateFile,
+  getFile,
+  updateFileName,
 } from "../prisma/queries.js";
 import { supabase } from "../supabase/supabase.js";
 const upload = multer({ storage: memoryStorage() });
@@ -254,3 +256,64 @@ export const uploadPost = [
     }
   },
 ];
+
+export const folderFilesGet = async (req, res) => {
+  try {
+    const folderId = parseInt(req.params.folderid);
+    const folder = await getFolder(folderId);
+    if (!folder) {
+      return res.redirect("/home");
+    }
+    res.render("folderFiles", { folder });
+  } catch (error) {
+    console.error("Error fetching folder files:", error);
+    res.redirect("/home");
+  }
+};
+
+export const deleteFileGet = async (req, res) => {
+  try {
+    const fileId = parseInt(req.params.fileid);
+    const file = await getFile(fileId);
+    if (!file) return res.redirect("/home");
+    // Delete from Supabase storage
+    const { error: storageError } = await supabase.storage
+      .from(process.env.SUPABASE_BUCKET_NAME)
+      .remove([file.url]);
+    if (storageError) {
+      console.error("Error deleting file from storage:", storageError);
+    }
+    // Delete from DB
+    await deleteFile(fileId);
+    res.redirect(`/folder/${file.folderId}`);
+  } catch (error) {
+    console.error("Delete file error:", error);
+    res.redirect("/home");
+  }
+};
+
+export const renameFileGet = async (req, res) => {
+  try {
+    const fileId = parseInt(req.params.fileid);
+    const file = await getFile(fileId);
+    if (!file) return res.redirect("/home");
+    res.render("renameFile", { file });
+  } catch (error) {
+    console.error("Rename file GET error:", error);
+    res.redirect("/home");
+  }
+};
+
+export const renameFilePost = async (req, res) => {
+  try {
+    const fileId = parseInt(req.params.fileid);
+    const newName = req.body.name;
+    const file = await getFile(fileId);
+    if (!file) return res.redirect("/home");
+    await updateFileName(fileId, newName);
+    res.redirect(`/folder/${file.folderId}`);
+  } catch (error) {
+    console.error("Rename file POST error:", error);
+    res.redirect("/home");
+  }
+};

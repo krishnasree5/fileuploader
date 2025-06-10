@@ -13,6 +13,10 @@ import {
   signupGet,
   signupPost,
   logout,
+  folderFilesGet,
+  deleteFileGet,
+  renameFileGet,
+  renameFilePost,
 } from "../controllers/controllers.js";
 import { requireAuth, redirectIfAuthenticated } from "../middleware/auth.js";
 
@@ -39,5 +43,11 @@ app.get("/delete/folder/:folderid", requireAuth, deleteGet);
 
 app.get("/upload", requireAuth, uploadGet);
 app.post("/upload", requireAuth, uploadPost);
+
+app.get("/folder/:folderid", requireAuth, folderFilesGet);
+
+app.get("/delete/file/:fileid", requireAuth, deleteFileGet);
+app.get("/rename/file/:fileid", requireAuth, renameFileGet);
+app.post("/rename/file/:fileid", requireAuth, renameFilePost);
 
 export default app;

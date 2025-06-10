@@ -92,3 +92,16 @@ export const updateFile = async (fileId, url) => {
     },
   });
 };
+
+export const getFile = async (fileId) => {
+  return await prisma.file.findUnique({
+    where: { id: fileId },
+  });
+};
+
+export const updateFileName = async (fileId, name) => {
+  return await prisma.file.update({
+    where: { id: fileId },
+    data: { name },
+  });
+};

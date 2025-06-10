@@ -1,0 +1,30 @@
+<h1>Files in <%= folder.name %></h1>
+<a href="/home">Back to Home</a>
+<table class="table">
+  <thead>
+    <tr>
+      <th>File Name</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (folder.File && folder.File.length > 0) { %> <%
+    folder.File.forEach(function(file) { %>
+    <tr>
+      <td><%= file.name %></td>
+      <td>
+        <a href="/rename/file/<%= file.id %>" class="btn btn-warning btn-sm"
+          >Rename</a
+        >
+        <a href="/delete/file/<%= file.id %>" class="btn btn-danger btn-sm"
+          >Delete</a
+        >
+      </td>
+    </tr>
+    <% }); %> <% } else { %>
+    <tr>
+      <td colspan="2">No files in this folder.</td>
+    </tr>
+    <% } %>
+  </tbody>
+</table>
