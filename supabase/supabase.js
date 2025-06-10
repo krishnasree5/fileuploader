@@ -5,6 +5,7 @@ const supabaseUrl = process.env.SUPABASE_PROJECT_URL;
 const supabaseKey = process.env.SUPABASE_PROJECT_API_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+export { supabase };
 
 export const uploadFile = async (uploadPath, file) => {
   const { data, error } = await supabase.storage

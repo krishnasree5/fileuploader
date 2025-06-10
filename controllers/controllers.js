@@ -17,6 +17,7 @@ import {
   deleteFile,
   updateFile,
 } from "../prisma/queries.js";
+import { supabase } from "../supabase/supabase.js";
 const upload = multer({ storage: memoryStorage() });
 
 // Auth Controllers
@@ -145,9 +146,58 @@ export const editPost = async (req, res) => {
 export const deleteGet = async (req, res) => {
   try {
     const folderId = parseInt(req.params.folderid);
+    const { user } = await getUser();
+
+    // Get folder with all its files
+    const folder = await getFolder(folderId);
+    // console.log(folder, user);
+
+    if (!folder) {
+      return res.redirect("/home");
+    }
+
+    // Delete all files from Supabase storage
+    if (folder.File && folder.File.length > 0) {
+      const filesToDelete = folder.File.map((file) => file.url);
+      // console.log(filesToDelete);
+
+      const { error: storageError } = await supabase.storage
+        .from(process.env.SUPABASE_BUCKET_NAME)
+        .remove(filesToDelete);
+
+      if (storageError) {
+        console.error("Error deleting files from storage:", storageError);
+      }
+    }
+
+    // Delete the entire folder path from storage
+    const folderPath = `${user.id}/${folderId}`;
+    // console.log(folderPath);
+
+    const { data: folderFiles } = await supabase.storage
+      .from(process.env.SUPABASE_BUCKET_NAME)
+      .list(folderPath);
+
+    if (folderFiles && folderFiles.length > 0) {
+      const remainingFiles = folderFiles.map(
+        (file) => `${folderPath}/${file.name}`
+      );
+      await supabase.storage
+        .from(process.env.SUPABASE_BUCKET_NAME)
+        .remove(remainingFiles);
+    }
+
+    // Delete the folder itself from storage
+    await supabase.storage
+      .from(process.env.SUPABASE_BUCKET_NAME)
+      .remove([folderPath]);
+
+    // Delete from Prisma database (this will cascade delete files due to your schema)
     await deleteFolder(folderId);
+
     res.redirect("/home");
   } catch (error) {
+    console.error("Delete folder error:", error);
     res.redirect("/login");
   }
 };
