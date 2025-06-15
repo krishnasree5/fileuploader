@@ -96,6 +96,7 @@ export const updateFile = async (fileId, url) => {
 export const getFile = async (fileId) => {
   return await prisma.file.findUnique({
     where: { id: fileId },
+    include: { folder: true },
   });
 };
 
@@ -103,5 +104,12 @@ export const updateFileName = async (fileId, name) => {
   return await prisma.file.update({
     where: { id: fileId },
     data: { name },
+  });
+};
+
+export const moveFile = async (fileId, newFolderId, newUrl) => {
+  return await prisma.file.update({
+    where: { id: fileId },
+    data: { folderId: newFolderId, url: newUrl },
   });
 };

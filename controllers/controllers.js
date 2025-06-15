@@ -18,11 +18,12 @@ import {
   updateFile,
   getFile,
   updateFileName,
+  moveFile,
 } from "../prisma/queries.js";
 import { supabase } from "../supabase/supabase.js";
 const upload = multer({ storage: memoryStorage() });
 
-// Auth Controllers
+// authentication Controllers
 export const loginGet = (req, res) => {
   res.render("login", { error: null });
 };
@@ -51,7 +52,7 @@ export const signupPost = async (req, res) => {
   const { firstName, lastName, username, email, password } = req.body;
 
   try {
-    // Create user in Supabase
+    // create user in supabase auth
     const { data: authData, error: authError } = await signUp(email, password, {
       firstName,
       lastName,
@@ -62,14 +63,14 @@ export const signupPost = async (req, res) => {
       return res.render("signup", { error: authError.message });
     }
 
-    // Create user in Prisma database using Supabase user ID
+    // create user in prisma database using supabase user ID
     await createUser({
-      id: authData.user.id, // Use Supabase user ID
+      id: authData.user.id, // use supabase user ID
       firstName,
       lastName,
       username,
       email,
-      password, // Note: In a real app, you should hash this password
+      password,
     });
 
     res.redirect("/login");
@@ -84,7 +85,7 @@ export const logout = async (req, res) => {
   res.redirect("/login");
 };
 
-// Protected Controllers
+// protected controllers
 export const home = async (req, res) => {
   try {
     console.log("Home controller: Getting user...");
@@ -150,7 +151,7 @@ export const deleteGet = async (req, res) => {
     const folderId = parseInt(req.params.folderid);
     const { user } = await getUser();
 
-    // Get folder with all its files
+    // get folder with all files
     const folder = await getFolder(folderId);
     // console.log(folder, user);
 
@@ -158,7 +159,7 @@ export const deleteGet = async (req, res) => {
       return res.redirect("/home");
     }
 
-    // Delete all files from Supabase storage
+    // delete all files from supabase storage
     if (folder.File && folder.File.length > 0) {
       const filesToDelete = folder.File.map((file) => file.url);
       // console.log(filesToDelete);
@@ -172,7 +173,7 @@ export const deleteGet = async (req, res) => {
       }
     }
 
-    // Delete the entire folder path from storage
+    // delete the entire folder path from storage
     const folderPath = `${user.id}/${folderId}`;
     // console.log(folderPath);
 
@@ -189,12 +190,12 @@ export const deleteGet = async (req, res) => {
         .remove(remainingFiles);
     }
 
-    // Delete the folder itself from storage
+    // delete the folder itself from storage
     await supabase.storage
       .from(process.env.SUPABASE_BUCKET_NAME)
       .remove([folderPath]);
 
-    // Delete from Prisma database (this will cascade delete files due to your schema)
+    // delete from prisma database
     await deleteFolder(folderId);
 
     res.redirect("/home");
@@ -226,14 +227,14 @@ export const uploadPost = [
       const folder = JSON.parse(req.body.folder);
       const folderId = folder.id;
 
-      // Create file record first to get the file ID
+      // create file record first to get the file ID
       const fileRecord = await uploadFilePrisma(
         req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_"),
         folderId,
-        "" // URL will be updated after upload
+        "" // url will be updated after upload
       );
 
-      // Use IDs in the storage path
+      // use ids in the storage path
       const uploadPath = `${user.id}/${folderId}/${fileRecord.id}`;
       const file = req.file.buffer;
 
@@ -241,12 +242,12 @@ export const uploadPost = [
 
       if (error) {
         console.error("Supabase upload error: ", error);
-        // Clean up the file record if upload fails
+        // clean up the file record if upload fails
         await deleteFile(fileRecord.id);
         return res.status(500).send("File upload failed");
       }
 
-      // Update the file record with the correct URL
+      // update the file record with the correct url
       await updateFile(fileRecord.id, uploadPath);
 
       res.redirect("/home");
@@ -276,14 +277,14 @@ export const deleteFileGet = async (req, res) => {
     const fileId = parseInt(req.params.fileid);
     const file = await getFile(fileId);
     if (!file) return res.redirect("/home");
-    // Delete from Supabase storage
+    // delete from supabase storage
     const { error: storageError } = await supabase.storage
       .from(process.env.SUPABASE_BUCKET_NAME)
       .remove([file.url]);
     if (storageError) {
       console.error("Error deleting file from storage:", storageError);
     }
-    // Delete from DB
+    // delete from db
     await deleteFile(fileId);
     res.redirect(`/folder/${file.folderId}`);
   } catch (error) {
@@ -314,6 +315,81 @@ export const renameFilePost = async (req, res) => {
     res.redirect(`/folder/${file.folderId}`);
   } catch (error) {
     console.error("Rename file POST error:", error);
+    res.redirect("/home");
+  }
+};
+
+export const moveFileGet = async (req, res) => {
+  try {
+    const fileId = parseInt(req.params.fileid);
+    const file = await getFile(fileId);
+    if (!file) return res.redirect("/home");
+    const allFolders = await getAllFolders(file.folder.createdBy);
+    // exclude current folder
+    const folders = allFolders.filter((f) => f.id !== file.folderId);
+    res.render("moveFile", { file, folders });
+  } catch (error) {
+    console.error("Move file GET error:", error);
+    res.redirect("/home");
+  }
+};
+
+export const moveFilePost = async (req, res) => {
+  try {
+    const fileId = parseInt(req.params.fileid);
+    const newFolderId = parseInt(req.body.folderId);
+    const file = await getFile(fileId);
+    if (!file) return res.redirect("/home");
+    if (file.folderId === newFolderId)
+      return res.redirect(`/folder/${file.folderId}`);
+    // get userId from folder
+    const oldPath = file.url;
+    const userId = oldPath.split("/")[0];
+    const newPath = `${userId}/${newFolderId}/${file.id}`;
+    // download file from old path
+    const { data: downloadData, error: downloadError } = await supabase.storage
+      .from(process.env.SUPABASE_BUCKET_NAME)
+      .download(oldPath);
+    if (downloadError) {
+      console.error("Error downloading file for move:", downloadError);
+      return res.redirect(`/folder/${file.folderId}`);
+    }
+    // upload to new path
+    const { error: uploadError } = await supabase.storage
+      .from(process.env.SUPABASE_BUCKET_NAME)
+      .upload(newPath, downloadData, { upsert: false });
+    if (uploadError) {
+      console.error("Error uploading file for move:", uploadError);
+      return res.redirect(`/folder/${file.folderId}`);
+    }
+    // delete old file
+    await supabase.storage
+      .from(process.env.SUPABASE_BUCKET_NAME)
+      .remove([oldPath]);
+    // update db
+    await moveFile(fileId, newFolderId, newPath);
+    res.redirect(`/folder/${newFolderId}`);
+  } catch (error) {
+    console.error("Move file POST error:", error);
+    res.redirect("/home");
+  }
+};
+
+export const downloadFileGet = async (req, res) => {
+  try {
+    const fileId = parseInt(req.params.fileid);
+    const file = await getFile(fileId);
+    if (!file) return res.redirect("/home");
+    // get public url from supabase
+    const { data } = await supabase.storage
+      .from(process.env.SUPABASE_BUCKET_NAME)
+      .getPublicUrl(file.url);
+    if (!data || !data.publicUrl) {
+      return res.status(404).send("File not found in storage");
+    }
+    return res.redirect(data.publicUrl);
+  } catch (error) {
+    console.error("Download file error:", error);
     res.redirect("/home");
   }
 };

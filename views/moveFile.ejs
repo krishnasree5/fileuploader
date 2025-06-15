@@ -1,0 +1,11 @@
+<h1>Move File: <%= file.name %></h1>
+<form action="/move/file/<%= file.id %>" method="POST">
+  <label for="folderId">Select Destination Folder:</label>
+  <select name="folderId" id="folderId" required>
+    <% folders.forEach(function(folder) { %>
+    <option value="<%= folder.id %>"><%= folder.name %></option>
+    <% }); %>
+  </select>
+  <button type="submit">Move</button>
+  <a href="/folder/<%= file.folderId %>">Cancel</a>
+</form>
