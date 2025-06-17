@@ -4,6 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.SUPABASE_PROJECT_URL;
 const supabaseKey = process.env.SUPABASE_PROJECT_API_KEY;
 
+// Validate environment variables
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Missing Supabase environment variables:");
+  console.error("SUPABASE_PROJECT_URL:", supabaseUrl ? "Set" : "Missing");
+  console.error("SUPABASE_PROJECT_API_KEY:", supabaseKey ? "Set" : "Missing");
+  throw new Error("Missing required Supabase environment variables");
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 export { supabase };
 
